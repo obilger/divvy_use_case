@@ -1,0 +1,40 @@
+---
+title: "Analyze 2021"
+author: "Olivier"
+date: "22/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Initialize root directory
+here::i_am("prepare/bike_sharing.Rmd")
+
+#load libraries
+library(tidyverse)
+library(here)       #helps file referencing
+library(janitor)    #simple little tools for examining and cleaning dirty data.
+
+#initialize data path
+data_path <- here("data")
+here(data_path)
+```
+
+# load csv files
+```{r}
+q1_2015 <- read_csv(here(data_path,"Divvy_Trips_2015-Q1.csv"))
+q2_2015 <- read_csv(here(data_path,"Divvy_Trips_2015-Q2.csv"))
+jul_2015 <- read_csv(here(data_path,"Divvy_Trips_2015_07.csv"))
+aug_2015 <- read_csv(here(data_path,"Divvy_Trips_2015_08.csv"))
+sep_2015 <- read_csv(here(data_path,"Divvy_Trips_2015_09.csv"))
+q4_2015 <- read_csv(here(data_path,"Divvy_Trips_2015_Q4.csv"))
+```
+# output discrepancies
+```{r}
+compare_df_cols(q1_2015, q2_2015, jul_2015, aug_2015,sep_2015, q4_2015, return="mismatch")
+str(q1_2015)
+```
+

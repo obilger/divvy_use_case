@@ -1,0 +1,46 @@
+---
+title: "Analyze 2021"
+author: "Olivier"
+date: "22/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Initialize root directory
+here::i_am("prepare/bike_sharing.Rmd")
+
+#load libraries
+library(tidyverse)
+library(here)       #helps file referencing
+library(janitor)    #simple little tools for examining and cleaning dirty data.
+
+#initialize data path
+data_path <- here("data")
+here(data_path)
+```
+
+# load csv files
+```{r}
+jan_2021 <- read_csv(here(data_path,"202101-divvy-tripdata.csv"))
+feb_2021 <- read_csv(here(data_path,"202102-divvy-tripdata.csv"))
+mar_2021 <- read_csv(here(data_path,"202103-divvy-tripdata.csv"))
+apr_2021 <- read_csv(here(data_path,"202104-divvy-tripdata.csv"))
+may_2021 <- read_csv(here(data_path,"202105-divvy-tripdata.csv"))
+jun_2021 <- read_csv(here(data_path,"202106-divvy-tripdata.csv"))
+jul_2021 <- read_csv(here(data_path,"202107-divvy-tripdata.csv"))
+aug_2021 <- read_csv(here(data_path,"202108-divvy-tripdata.csv"))
+sep_2021 <- read_csv(here(data_path,"202109-divvy-tripdata.csv"))
+oct_2021 <- read_csv(here(data_path,"202110-divvy-tripdata.csv"))
+nov_2021 <- read_csv(here(data_path,"202111-divvy-tripdata.csv"))
+dec_2021 <- read_csv(here(data_path,"202112-divvy-tripdata.csv"))
+```
+# output discrepancies
+```{r}
+compare_df_cols(jan_2021, feb_2021, mar_2021, apr_2021, may_2021, jun_2021, jul_2021, aug_2021, sep_2021, oct_2021, nov_2021,dec_2021, return="mismatch")
+str(dec_2021)
+```
+

@@ -1,0 +1,1058 @@
+---
+title: "Divvy - Prepare"
+output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Divvy case study
+
+This analysis is based on the Divvy case study "'Sophisticated, Clear,
+and Polished': Divvy and Data Visualization" written by Kevin Hartman
+(found here: <https://artscience.blog/home/divvy-dataviz-case-study>).
+The purpose of this script is to consolidate downloaded Divvy data into
+a single dataframe and then conduct simple analysis to help answer the
+key question: "In what ways do members and casual riders use Divvy bikes
+differently?"
+
+## Initialization
+
+increase memory
+
+```{r}
+memory.limit(size=16000)
+Sys.setlocale("LC_TIME", "C") # force locales to English
+```
+
+## Initialize the project root
+
+Use here package to not relying on hardcoded path
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+here::i_am("prepare/divvy_analysis.Rmd")
+```
+
+### Install required packages
+
+```{r}
+
+# libraries to be loaded
+libraries <- c("tidyverse" 
+              ,"lubridate"
+              ,"here"
+              ,"ggplot2"
+              ,"scales"
+              ,"data.table"
+              ,"janitor")
+
+for (i in 1:length(librairies)) {
+  
+  # Here we are checking if the package is installed
+  if(!require(librairies[i], character.only = TRUE)){
+    # If the package is not in the system then it will be install
+    install.packages(librairies[i], dependencies = TRUE)
+    # Here we are loading the package
+    library(librairies[i], character.only = TRUE) # a logical indicating package to be character strings
+  } 
+  
+}
+```
+
+### Initialize data path
+
+```{r}
+data_path <- here("data")
+here(data_path)
+```
+
+# Import Data
+
+Upload Divvy datasets (csv files) and process each year individually to
+avoid overloading the memory due to the size of the files and the
+limited amount of memory I have on my laptop
+
+## Year 2021
+
+Read csv files and drop columns: \* ride_id: useless for analysis \* lat
+& long: not supported before 2020
+
+This code leverages the data.table package since the package is faster
+for reading and writing csv files and data.table are more memory
+efficient than data.frame
+
+```{r}
+jan_2021 <- fread(here(data_path,"202101-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+feb_2021 <- fread(here(data_path,"202102-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+mar_2021 <- fread(here(data_path,"202103-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+apr_2021 <- fread(here(data_path,"202104-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+may_2021 <- fread(here(data_path,"202105-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+jun_2021 <- fread(here(data_path,"202106-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+jul_2021 <- fread(here(data_path,"202107-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+aug_2021 <- fread(here(data_path,"202108-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+sep_2021 <- fread(here(data_path,"202109-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+oct_2021 <- fread(here(data_path,"202110-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+nov_2021 <- fread(here(data_path,"202111-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+dec_2021 <- fread(here(data_path,"202112-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+
+ # create data tables list
+y2021 <- list(jan_2021, feb_2021, mar_2021, apr_2021, may_2021, jun_2021, jul_2021, aug_2021, sep_2021, oct_2021, nov_2021, dec_2021)
+
+# needed for rm since rm doesn't accept a list but a character vector where rbindlist requests a real list
+c2021 <- c('jan_2021', 'feb_2021', 'mar_2021', 'apr_2021', 'may_2021', 'jun_2021', 'jul_2021', 'aug_2021', 'sep_2021', 'oct_2021', 'nov_2021', 'dec_2021') 
+```
+
+Join individual datasets, remove columns not supported before 2021 and
+remove useless datasets to free up the memory
+
+```{r}
+all_trips <-  rbindlist(y2021)
+rm(list = c2021, y2021, c2021) # remove datasets
+gc() # reclaim free memory
+```
+
+## Year 2020
+
+Read csv files and cast start_station_id and end_station_id as character
+(except dec2020) Don't need anymore to mutate fields as requested when
+using read_csv drop columns \* ride_id: useless for analysis \* lat &
+long: not supported before 2020
+
+```{r}
+q1_2020 <- fread(here(data_path,"Divvy_Trips_2020_Q1.csv")
+                 ,colClasses=c(start_station_id="character", end_station_id="character")
+                 ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng"))
+apr_2020 <- fread(here(data_path,"202004-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+may_2020 <- fread(here(data_path,"202005-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+jun_2020 <- fread(here(data_path,"202006-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+jul_2020 <- fread(here(data_path,"202007-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+aug_2020 <- fread(here(data_path,"202008-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+sep_2020 <- fread(here(data_path,"202009-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+oct_2020 <- fread(here(data_path,"202010-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+nov_2020 <- fread(here(data_path,"202011-divvy-tripdata.csv")
+                  ,colClasses=c(start_station_id="character", end_station_id="character")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+dec_2020 <- fread(here(data_path,"202012-divvy-tripdata.csv")
+                  ,drop=c("ride_id","start_lat", "start_lng", "end_lat", "end_lng")
+                  ,na.strings = c("")) # set empty fields to NA
+
+y2020 <- list(q1_2020, apr_2020, may_2020, jun_2020, jul_2020, aug_2020, sep_2020, oct_2020, nov_2020, dec_2020)
+c2020 <- c('q1_2020', 'apr_2020', 'may_2020', 'jun_2020', 'jul_2020', 'aug_2020', 'sep_2020', 'oct_2020', 'nov_2020', 'dec_2020')
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory
+
+```{r}
+trips_2020 <- rbindlist(y2020)
+rm(list = c2020, y2020, c2020)
+tables_to_bind <- list(all_trips, trips_2020)
+all_trips <- rbindlist(tables_to_bind)
+rm(trips_2020, tables_to_bind)
+gc()
+```
+
+## Year 2019
+
+Read csv files and drop columns
+
+-   trip_id & "01 - Rental Details Rental ID" : useless for analysis
+
+-   bikeid & "01 - Rental Details Bike ID": weird values in 2019,
+    inconsistent with rideable_type
+
+-   tripduration, gender and birthyear: only supported before 2020
+
+```{r}
+q1_2019 <- fread(here(data_path,"Divvy_Trips_2019_Q1.csv")
+                 ,colClasses=c(trip_id="character"
+                               ,from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q2_2019 <- fread(here(data_path,"Divvy_Trips_2019_Q2.csv")
+                 ,colClasses=c("03 - Rental Start Station ID" = "character"
+                               ,"02 - Rental End Station ID" = "character")
+                 ,drop=c("01 - Rental Details Rental ID" 
+                         ,"01 - Rental Details Bike ID"
+                         ,"01 - Rental Details Duration In Seconds Uncapped"
+                         ,"Member Gender"
+                         ,"05 - Member Details Member Birthday Year")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q3_2019 <- fread(here(data_path,"Divvy_Trips_2019_Q3.csv")
+                 ,colClasses=c(trip_id="character"
+                               ,from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q4_2019 <- fread(here(data_path,"Divvy_Trips_2019_Q4.csv")
+                 ,colClasses=c(trip_id="character"
+                               ,from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+```
+
+Fields names are not consistent across 2019 need to be renamed before
+joining them into one single dataframe and to make them consistent with
+2021 (as this will be the supposed going-forward table design for Divvy)
+
+```{r}
+q1_2019 <- rename(q1_2019
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+q2_2019 <- rename(q2_2019
+                   ,started_at = "01 - Rental Details Local Start Time"  
+                   ,ended_at = "01 - Rental Details Local End Time"
+                   ,start_station_name = "03 - Rental Start Station Name" 
+                   ,start_station_id = "03 - Rental Start Station ID"
+                   ,end_station_name = "02 - Rental End Station Name" 
+                   ,end_station_id = "02 - Rental End Station ID"
+                   ,member_casual = "User Type"
+                  )
+
+q3_2019 <- rename(q3_2019
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+q4_2019 <- rename(q4_2019
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+c2019 <- c('q1_2019', 'q2_2019', 'q3_2019', 'q4_2019')
+y2019 <- list(q1_2019, q2_2019, q3_2019, q4_2019)
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory Replace bikeid by NA since 2019 dataset contains weird data
+
+```{r}
+trips_2019 <- rbindlist(y2019)
+rm(list = c2019, y2019, c2019)
+gc()
+tables_to_bind <- list(all_trips, trips_2019)
+all_trips <- rbindlist(tables_to_bind, use.names=TRUE, fill = TRUE) # fill = TRUE since 2019 doesn't have a valid bikeid column. this will add a blank column to the 2019 dataset
+rm(trips_2019, tables_to_bind)
+gc()
+```
+
+## Year 2018
+
+Read csv files and drop columns
+
+-   trip_id & "01 - Rental Details Rental ID" : useless for analysis
+
+-   bikeid & "01 - Rental Details Bike ID": weird values in 2018
+
+-   tripduration, gender and birthyear: only supported before 2020
+
+```{r}
+q1_2018 <- fread(here(data_path,"Divvy_Trips_2018_Q1.csv")
+                 ,colClasses=c("03 - Rental Start Station ID" = "character"
+                               ,"02 - Rental End Station ID" = "character")
+                 ,drop=c("01 - Rental Details Rental ID" 
+                         ,"01 - Rental Details Bike ID"
+                         ,"01 - Rental Details Duration In Seconds Uncapped"
+                         ,"Member Gender"
+                         ,"05 - Member Details Member Birthday Year")
+                 ,na.strings = c("")) # set empty fields to NA
+                 
+
+q2_2018 <- fread(here(data_path,"Divvy_Trips_2018_Q2.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q3_2018 <- fread(here(data_path,"Divvy_Trips_2018_Q3.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q4_2018 <- fread(here(data_path,"Divvy_Trips_2018_Q4.csv")
+                 ,colClasses=c(bikeid="character"
+                               ,from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+```
+
+Fields names are not consistent across 2019 need to be renamed before
+joining them into one single dataframe and to make them consistent with
+2021 (as this will be the supposed going-forward table design for Divvy)
+
+```{r}
+q1_2018 <- rename(q1_2018
+                   ,started_at = "01 - Rental Details Local Start Time"  
+                   ,ended_at = "01 - Rental Details Local End Time"  
+                   ,start_station_name = "03 - Rental Start Station Name" 
+                   ,start_station_id = "03 - Rental Start Station ID"
+                   ,end_station_name = "02 - Rental End Station Name" 
+                   ,end_station_id = "02 - Rental End Station ID"
+                   ,member_casual = "User Type"
+                  )
+
+q2_2018 <- rename(q2_2018
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+q3_2018 <- rename(q3_2018
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+q4_2018 <- rename(q4_2018
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+
+y2018 <- list(q1_2018, q2_2018, q3_2018, q4_2018)
+c2018 <- c('q1_2018', 'q2_2018', 'q3_2018', 'q4_2018')
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory
+
+```{r}
+trips_2018 <- rbindlist(y2018)
+rm(list = c2018, y2018, c2018)
+gc()
+tables_to_bind <- list(all_trips, trips_2018)
+all_trips <- rbindlist(tables_to_bind, use.names=TRUE, fill=TRUE)
+rm(trips_2018, tables_to_bind)
+gc()
+```
+
+## Year 2017
+
+Read csv files and drop columns
+
+-   trip_id & "01 - Rental Details Rental ID" : useless for analysis
+
+-   bikeid & "01 - Rental Details Bike ID": weird values in 2017
+
+-   tripduration, gender and birthyear: only supported before 2020
+
+```{r}
+q1_2017 <- fread(here(data_path,"Divvy_Trips_2017_Q1.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q2_2017 <- fread(here(data_path,"Divvy_Trips_2017_Q2.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q3_2017 <- fread(here(data_path,"Divvy_Trips_2017_Q3.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q4_2017 <- fread(here(data_path,"Divvy_Trips_2017_Q4.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("trip_id", "bikeid", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+c2017 <- c('q1_2017', 'q2_2017', 'q3_2017', 'q4_2017')
+y2017 <- list(q1_2017, q2_2017, q3_2017, q4_2017)
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory
+
+```{r}
+trips_2017 <- rbindlist(y2017)
+rm(list = c2017, y2017, c2017)
+gc() 
+```
+
+Rename fields names to make them consistent with 2021
+
+```{r}
+trips_2017 <- rename(trips_2017
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id
+                   ,member_casual = usertype
+                  )
+```
+
+Convert fields so that they can stack correctly with 2021 & 2020 format
+(N.B.: can't use the fasttime package since the date format is not YMD)
+
+```{r}
+trips_2017 <-  mutate(trips_2017,
+                      started_at = as.POSIXct(started_at, format = "%m/%d/%Y %H:%M:%S"),
+                      ended_at = as.POSIXct(ended_at, format = "%m/%d/%Y %H:%M:%S"))
+gc()
+```
+
+Join with global dataset
+
+```{r}
+tables_to_bind <- list(all_trips, trips_2017)
+all_trips <- rbindlist(tables_to_bind, use.names=TRUE, fill=TRUE)
+rm(trips_2017, tables_to_bind)
+gc()
+```
+
+## Year 2016
+
+Read csv files
+
+```{r}
+q1_2016 <- fread(here(data_path,"Divvy_Trips_2016_Q1.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+apr_2016 <- fread(here(data_path,"Divvy_Trips_2016_04.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                  ,na.strings = c("")) # set empty fields to NA
+
+may_2016 <- fread(here(data_path,"Divvy_Trips_2016_05.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                  ,na.strings = c("")) # set empty fields to NA
+
+jun_2016 <- fread(here(data_path,"Divvy_Trips_2016_06.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                  ,na.strings = c("")) # set empty fields to NA
+
+q3_2016 <- fread(here(data_path,"Divvy_Trips_2016_Q3.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q4_2016 <- fread(here(data_path,"Divvy_Trips_2016_Q4.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+c2016 <- c('q1_2016', 'apr_2016', 'may_2016', 'jun_2016', 'q3_2016', 'q4_2016')
+y2016 <- list(q1_2016, apr_2016, may_2016, jun_2016, q3_2016, q4_2016)
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory
+
+```{r}
+rm(list = c2016, y2016, c2016)
+gc()
+```
+
+Rename fields names to make them consistent with 2021
+
+```{r}
+trips_2016 <- rename(trips_2016
+                   ,started_at = starttime  
+                   ,ended_at = stoptime  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype
+                  )
+```
+
+Convert fields so that they can stack correctly with 2021 & 2020 format
+
+```{r}
+trips_2016 <-  mutate(trips_2016
+                      ,started_at = as.POSIXct(started_at, format = "%m/%d/%Y %H:%M:%S")
+                      ,ended_at = as.POSIXct(ended_at, format = "%m/%d/%Y %H:%M:%S"))
+gc()
+```
+
+Join with global dataset
+
+```{r}
+tables_to_bind <- list(all_trips, trips_2016)
+all_trips <- rbindlist(tables_to_bind, use.names=TRUE, fill=TRUE)
+rm(trips_2016, tables_to_bind)
+gc()
+```
+
+## Year 2015
+
+Read csv files
+
+```{r}
+q1_2015 <- fread(here(data_path,"Divvy_Trips_2015-Q1.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+q2_2015 <- fread(here(data_path,"Divvy_Trips_2015-Q2.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+jul_2015 <- fread(here(data_path,"Divvy_Trips_2015_07.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                  ,na.strings = c("")) # set empty fields to NA
+
+aug_2015 <- fread(here(data_path,"Divvy_Trips_2015_08.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear"))
+
+sep_2015 <- fread(here(data_path,"Divvy_Trips_2015_09.csv")
+                  ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                  ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                  ,na.strings = c("")) # set empty fields to NA
+
+q4_2015 <- fread(here(data_path,"Divvy_Trips_2015_Q4.csv")
+                 ,colClasses=c(from_station_id="character"
+                               ,to_station_id="character")
+                 ,drop=c("bikeid","trip_id", "tripduration", "gender", "birthyear")
+                 ,na.strings = c("")) # set empty fields to NA
+
+c2015 <- c('q1_2015', 'q2_2015', 'jul_2015', 'aug_2015', 'sep_2015', 'q4_2015')
+y2015 <- list(q1_2015, q2_2015, jul_2015, aug_2015, sep_2015, q4_2015)
+```
+
+Join individual datasets and remove useless datasets to free up the
+memory
+
+```{r}
+trips_2015 <- rbindlist(y2015)
+rm(list = c2015, y2015, c2015) # free up memory by removing individual dataframes
+gc() # reclaim free memory
+```
+
+Rename fields names to make them consistent with 2021
+
+```{r}
+trips_2015 <- rename(trips_2015
+                   ,started_at = starttime  
+                   ,ended_at = stoptime  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id
+                   ,member_casual = usertype)
+```
+
+Convert fields so that they can stack correctly with 2021 & 2020 format
+
+```{r}
+trips_2015 <-  mutate(trips_2015,
+                      started_at = as.POSIXct(started_at, format = "%m/%d/%Y %H:%M:%S"),
+                      ended_at = as.POSIXct(ended_at, format = "%m/%d/%Y %H:%M:%S"))
+gc()
+```
+
+Join with global dataset
+
+```{r}
+tables_to_bind <- list(all_trips, trips_2015)
+all_trips <- rbindlist(tables_to_bind, use.names=TRUE, fill=TRUE)
+rm(trips_2015, tables_to_bind)
+gc()
+```
+
+# Clean and transform data
+
+## Fix few issues
+
+There are a few problems we will need to fix:
+
+1.  In the "member_casual" column, there are two names for members
+    ("member" and "Subscriber") and two names for casual riders
+    ("Customer" and "casual"). We will need to consolidate that from
+    four to two labels.
+
+2.  The data can only be aggregated at the ride-level, which is too
+    granular. We will want to add some additional columns of data --
+    such as day, month, year -- that provide additional opportunities to
+    aggregate the data. 3. We will want to add a calculated field for
+    length of ride since the 2020Q1 data did not have the "tripduration"
+    column. We will add "ride_length" to the entire dataframe for
+    consistency. 4. There are some rides where tripduration shows up as
+    negative or 0, including several hundred rides where Divvy took
+    bikes out of circulation for Quality Control reasons. We will want
+    to delete these rides.
+
+3.  In the "member_casual" column, replace "Subscriber" with "member"
+    and "Customer" with "casual" Before 2020, Divvy used different
+    labels for these two types of riders ... we will want to make our
+    dataframe consistent with their current nomenclature N.B.: "Level"
+    is a special property of a column that is retained even if a subset
+    does not contain any values from a specific level Begin by seeing
+    how many observations fall under each usertype
+
+```{r}
+table(all_trips$member_casual)
+```
+
+### Reassign to the desired values (we will go with the current 2020 labels)
+
+```{r}
+all_trips <-  all_trips %>% 
+  mutate(member_casual = recode(member_casual
+                           ,"Subscriber" = "member"
+                           ,"Customer" = "casual"))
+```
+
+Check to make sure the proper number of observations were reassigned
+
+```{r}
+table(all_trips$member_casual)
+```
+
+### Add columns that list the date, month, day, and year of each ride
+
+This will allow us to aggregate ride data for each month, day, or year
+... before completing these operations we could only aggregate at the
+ride level More on date formats in R found at that
+[link](https://www.statmethods.net/input/dates.html)
+
+```{r}
+all_trips$hour <- format(as.POSIXct(all_trips$started_at), "%H")
+all_trips$date <- as.Date(all_trips$started_at) #The default format is yyyy-mm-dd
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+all_trips$day_type <- fifelse(format(as.Date(all_trips$date), "%u") >5, "WEEKEND", "WORKDAY")
+```
+
+### Add a "ride_length" calculation to all_trips (in seconds)
+
+Convert "ride_length" to numeric so we can run calculations on the data
+
+```{r}
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at, units = "mins")
+all_trips$ride_length <- as.numeric(all_trips$ride_length)
+```
+
+## Remove "bad" data
+
+The dataframe includes a few hundred entries when bikes were taken out
+of docks and checked for quality by Divvy or ride_length was negative
+
+<https://www.datasciencemadesimple.com/delete-or-drop-rows-in-r-with-conditions-2/>
+
+```{r}
+nb_observations <- nrow(all_trips)
+sprintf("# observations : %d", nb_observations )
+
+nb_bad_observations <- all_trips %>% 
+  filter(start_station_name == "HQ QR" | ride_length <= 0) %>% 
+  nrow()
+  
+sprintf("# observations with start_station_name=HQ QR or/and ride length <= 0 : %d (%.3f%%)", nb_bad_observations, 100 * nb_bad_observations/nb_observations)
+
+all_trips <- all_trips[!(all_trips$start_station_name == "HQ QR" 
+                         | all_trips$ride_length <= 0),]
+sprintf("# estimated observations after deletion: %d",nb_observations - nb_bad_observations)
+sprintf("# observations after deletion: %d", nrow(all_trips))
+
+nb_dependents <- all_trips %>% 
+  filter(member_casual == "Dependent") %>% 
+  nrow()
+
+sprintf("# observations with dependent : %d (%.3f%%)", nb_dependents, 100 * nb_dependents/nb_observations)
+
+all_trips <- all_trips[!(member_casual == "Dependent"),]
+
+```
+
+## Save csv file for future analysis
+
+To avoid R studio session aborted error message and loosing
+everything...
+
+```{r}
+fwrite(all_trips, file = here(data_path,'all_trips.csv'))
+```
+
+# Analysis
+
+## Data quality
+
+Before analyzing the data, let's assess their quality
+
+### Ride length distribution including outliers
+
+```{r}
+ggplot(all_trips) +
+  aes(x=member_casual, y=ride_length) +
+  geom_boxplot() +
+  labs(title = "Ride length - distribution including outliers"
+       ,x = "User type"
+       ,y = "Ride length") + 
+  annotate("text"
+           ,x = "casual"
+           ,y= 10000
+           ,label = "Very extreme values > 1000 mins") +
+  geom_jitter(position=position_jitter(0.2)) +
+  theme_minimal()
+
+```
+
+### Removing outliers
+
+```{r}
+#outliers <-subset(all_trips, all_trips$ride_length 
+#                  %in% boxplot(all_trips$ride_length ~ all_trips$member_casual,
+#                               PLOT=FALSE)$out)
+
+lower_band <- quantile(all_trips$ride_length, 0.05)
+upper_band <- quantile(all_trips$ride_length, 0.999)
+sprintf("outliers are observations where ride_length < %f mins or ride_length > %f mins", lower_band, upper_band)
+outliers <- subset(all_trips
+                   , all_trips$ride_length < lower_band |
+                     all_trips$ride_length  > upper_band)
+
+
+
+outliers <- outliers %>% 
+  arrange(ride_length)
+
+nb_outliers <- nrow(outliers)
+
+sprintf("# outliers: %d (%.3f%%)"
+        ,nb_outliers
+        ,100*nb_outliers/nb_observations)
+
+sprintf("# observations after deletion: %d"
+        ,nb_observations - nb_outliers  )
+
+all_trips_clean <- fsetdiff(all_trips, outliers, all = TRUE)
+```
+
+### Ride length distribution excluding outliers after cleaning
+
+```{r}
+ggplot(all_trips) +
+  aes(x = member_casual
+      ,y = ride_length
+      ,fill = member_casual) +
+   geom_jitter(width = 0.3
+              ,alpha = 0.1) +
+  geom_boxplot(outlier.shape = NA # remove outliers since geom_jitter adds them again
+               ,alpha = 0.8) +  
+  labs(title = "Ride length - distribution excluding outliers"
+       ,x = "User type"
+       ,y = "Ride length") +
+  scale_y_continuous(limits = quantile(all_trips$ride_length, c(0.1, 0.995))) +
+  scale_fill_manual(values = c("#ceff00", "#32cd32")) +
+  theme_minimal() +
+  theme(legend.position="none") 
+```
+
+### Ride length histogram distribution by each user type
+
+```{r}
+ggplot(all_trips_clean) +
+  aes(x = ride_length) +
+  geom_histogram(fill="#ceff00") +
+  facet_wrap(~member_casual) +
+  labs(title = "Ride length distribution after cleaning"
+       ,subtitle = paste0("Extreme values between 300 and ", round(upper_band), " not plotted, values over ", round(upper_band), " removed" )
+       ,x = "Ride length"
+       ,y = "# observations") +
+  scale_x_log10() +
+  theme_minimal()
+```
+
+### Average, min, max and median ride length by each user type
+
+```{r}
+df_stats <- all_trips %>% 
+  group_by(member_casual) %>% 
+  summarise(
+    count = n()
+    ,min = min(ride_length)
+    ,max = max(ride_length)
+    ,median = median(ride_length)
+    ,mean = mean(ride_length))
+df_stats
+
+df_stats_clean <- all_trips_clean %>% 
+  group_by(member_casual) %>% 
+  summarise(
+    count = n()
+    ,min = min(ride_length)
+    ,max = max(ride_length)
+    ,median = median(ride_length)
+    ,mean = mean(ride_length))
+df_stats_clean
+  
+```
+
+Since the data distribution is really weird with still extreme values as
+demonstrated with median and mean values very different, I will use the
+median value for the rest of the analysis. The median value is less
+affected by extreme values
+
+### Ride length distribution per day and user type after cleaning
+
+```{r}
+ggplot(all_trips_clean) +
+  aes(x = day_of_week
+      ,y = ride_length
+      ,fill = member_casual) +
+  geom_violin(adjust = 1L, scale = "area") +
+  scale_fill_brewer(palette = "Set1", direction = 1) +
+  labs(x = "Days"
+       ,y = "Ride length"
+       ,title = "Ride length distribution per day and user type after cleaning") +
+  scale_fill_manual(name = "User type"
+                    ,values = c("#ceff00", "#32cd32")) +
+  theme_minimal()
+```
+
+### Why so many outliers ?
+
+```{r}
+ggplot(outliers) +
+  aes(x = year) +
+  geom_bar(fill = "#d0f0c0") +
+  labs(title = "Outliers by each year"
+       ,x = "Years") +
+  theme_minimal()
+
+```
+
+This is discussion we need to have with SME
+
+## How do annual members and casual riders use Cyclistic bikes differently?
+
+Notice that the days of the week are out of order. Let's fix that before
+analyzing data
+
+```{r}
+all_trips_clean$day_of_week <- ordered(all_trips_clean$day_of_week, levels=c("Monday", "Tuesday", "Thursday", "Wednesday", "Friday", "Saturday", "Sunday"))
+```
+
+### How long do they ride ?
+
+```{r}
+ggplot(all_trips_clean) +
+  aes(x = day_of_week
+      ,y = ride_length
+      ,fill = member_casual) +
+  geom_bar(position = "dodge"
+           ,stat = "summary"
+           ,fun = "median") +
+  scale_fill_brewer(palette = "Set1", direction = 1) +
+  labs(x = "Days"
+       ,y = "Rides length in mins"
+       ,title = "Median ride time by each day for members vs casual users") +
+  scale_fill_manual(name = "User type"
+                    ,values = c("#ceff00", "#32cd32")) +
+  theme_minimal()
+  
+```
+
+### Which user type rides the most?
+
+```{r}
+ggplot(all_trips_clean) +
+  aes(x = day_of_week
+      ,fill = member_casual) +
+  geom_bar(position = "dodge") +
+  labs(x = "Days"
+       ,y = "# rides"
+       ,title = "Number of rides by each day for members vs casual users") +
+  scale_fill_manual(name = "User type"
+                    ,values = c("#ceff00", "#32cd32")) +
+  theme_minimal()
+```
+
+### Do they ride mostly during workdays or weekend ?
+
+```{r}
+df_stats <- all_trips_clean %>%
+ group_by(member_casual, day_type) %>%
+  summarise(cnt = n()) %>%
+  mutate(freq = percent(cnt / sum(cnt), accuracy = .01))
+
+
+ggplot(df_stats) +
+  aes(x = ""
+      ,y = freq
+      ,fill = day_type) +
+  geom_col() +
+  geom_text(aes(label = freq),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y") +
+  labs(title = "Percent rides by day type") +
+  scale_fill_manual(name = "Day type"
+                    ,labels = c("Weekend", "Workday")
+                    ,values = c("#3cb371", "#d0f0c0")) +
+  theme_void() +
+  facet_grid(cols = vars(member_casual)
+             ,switch = "both")
+```
+
+### Do members use bike to commute ?
+
+```{r}
+ggplot(all_trips_clean) +
+  aes(x = hour
+   ,fill = member_casual) +
+  geom_bar(position = "dodge") +
+  scale_fill_brewer(palette = "Set1", direction = 1) +
+  labs(x = "Hours"
+       ,y = "# rides"
+       ,title = "# rides per day") +
+  scale_fill_manual(name = "User type"
+                    ,values = c("#ceff00", "#32cd32")) +
+  theme_minimal()
+```
+
+### Which bike type is the most popular ?
+
+```{r}
+all_trips_clean %>%
+ filter(!(rideable_type %in% "docked_bike")) %>%
+ ggplot() +
+  aes(x = day_of_week, fill = rideable_type) +
+  labs(title = "# Rides by each day and each bike type"
+       ,x = "Days") +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(name = "User type"
+                    ,values = c("#ff4500", "#ff8c00")) +
+   theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~member_casual)
+```
+
+# Conclusions
+
+1.  Since casual riders tend to ride bikes longer and more often during
+    Friday, Saturday and Sunday,
+
+-   limit the ride duration for single-day passes
+
+-   limit the number of rides for full-day passes
+
+-   remove those limits for members
+
+    Implement those changes and then measure improvements
+
+2.  Since electric bikes are very popular among casual users (half of
+    their rides), reserve those bikes to the annual pass members
+
+# Next steps
+
+1.  Analyze outliers
+
+2.  Analyze monthly usage per bike type to see how much electric bikes
+    are gaining in popularity
+
+3.  Analyse geo_locations and correlate with user type
+
+4.  Add a unique ID for each user to get more insights about the rides
+    frequency 5 Add the pass type to correlate with usage and make
+    pro-active recommendations to switch casual users to members 6 Add
+    the birth year to correlate with usage
